@@ -27,6 +27,7 @@
 #
 ################################################################################
 
+import sys
 import inspect
 import os
 import importlib
@@ -153,6 +154,14 @@ def write_to_file(info: Dict, config: 'GenerationConfig'):
 
 
 def parse_options() -> 'GenerationConfig':
+    # Start after "--" option if we run this script from blender binary.
+    argv = sys.argv
+    try:
+        index = argv.index("--") + 1
+    except:
+        index = len(argv)
+    argv = argv[index:]
+
     usage = """Usage: blender -noaudio --factory-startup --background --python
                {} -- [-m <first_import_module_name>] [-o <output_file>]"""\
         .format(__file__)
@@ -166,7 +175,7 @@ def parse_options() -> 'GenerationConfig':
     parser.add_argument(
         "-o", dest="output_file", type=str, help="Output file."
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     config = GenerationConfig()
     config.first_import_module_name = args.first_import_module_name
