@@ -77,6 +77,7 @@ def make_bpy_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGeneratio
     mod_files = [
         "{}/mods/common/analyzer/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
         "{}/mods/common/analyzer/bpy.generated.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/generated-mods/gen_modules_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/")
     ]
     if config.mod_version in ["2.80"]:
         mod_files.append("{}/mods/2.80/analyzer/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"))
@@ -120,7 +121,10 @@ def make_gpu_extras_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGe
     all_files = glob.glob(INPUT_DIR + "/bpy_extras*.xml")
     excludes_files = glob.glob(INPUT_DIR + "/bpy_extras*.xml")
     files = list(set(all_files) - set(excludes_files))
-    return fbm.PackageGenerationRule("gpu_extras", files, fbm.BaseAnalyzer(), fbm.BaseGenerator())
+    mod_files = [
+        "{}/generated-mods/gen_modules_modfile/gpu_extras.json".format(MOD_FILES_DIR).replace("\\", "/")
+    ]
+    return fbm.PackageGenerationRule("gpu_extras", files, fbm.AnalyzerWithModFile(mod_files), fbm.BaseGenerator())
 
 
 def make_freestyle_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGenerationRule':
@@ -135,6 +139,7 @@ def make_bpy_extras_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGe
     files = glob.glob(INPUT_DIR + "/bpy_extras*.xml")
     mod_files = [
         "{}/mods/common/analyzer/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/generated-mods/gen_modules_modfile/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/")
     ]
     return fbm.PackageGenerationRule("bpy_extras", files, fbm.AnalyzerWithModFile(mod_files), fbm.BaseGenerator())
 
@@ -150,6 +155,21 @@ def make_bmesh_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGenerat
         "{}/mods/common/analyzer/bmesh.json".format(MOD_FILES_DIR).replace("\\", "/"),
     ]
     return fbm.PackageGenerationRule("bmesh", files, fbm.AnalyzerWithModFile(mod_files), fbm.BaseGenerator())
+
+
+def make_other_rules(config: 'fbm.PackageGeneratorConfig') -> List['fbm.PackageGenerationRule']:
+    mod_files = glob.glob("{}/generated-mods/gen_modules_modfile/*.json".format(MOD_FILES_DIR).replace("\\", "/"))
+    mod_files -= {
+        "{}/generated-mods/gen_modules_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/generated-mods/gen_modules_modfile/gpu_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/generated-mods/gen_modules_modfile/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
+    }
+
+    rules = []
+    for mod_file in mod_files:
+        mod_name = mod_file[mod_file.rfind("/") + 1:].replace(".json", "")
+        rules.append(fbm.PackageGenerationRule(mod_name, [], fbm.AnalyzerWithModFile([mod_file]), fbm.BaseGenerator()))
+    return rules
 
 
 def parse_options(config: 'fbm.PackageGeneratorConfig'):
@@ -214,6 +234,8 @@ def main():
     pkg_generator.add_rule(make_bpy_extras_rule(config))
     pkg_generator.add_rule(make_aud_rule(config))
     pkg_generator.add_rule(make_bmesh_rule(config))
+    for rule in make_other_rules(config):
+        pkg_generator.add_rule(rule)
     pkg_generator.generate()
 
 

@@ -158,7 +158,11 @@ def write_to_modfile(info: Dict, config: 'GenerationConfig'):
     data = {}
 
     for module_name, module_info in info.items():
-        package_name = module_name[:module_name.find(".")]
+        package_name = module_name
+        index = package_name.find(".")
+        if index != -1:
+            package_name = package_name[:index]
+
         if package_name not in data.keys():
             data[package_name] = {
                 "new": []
