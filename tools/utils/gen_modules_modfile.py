@@ -5,7 +5,7 @@
 # Description:
 #   gen_module_modfile.py generates python classes and functions definition
 #   from python modules in blender's 'modules' directory.
-#   The definition file is output as a JSON file.
+#   The definitions are output as a modfile format (JSON).
 #
 # Note:
 #   This script needs to run from blender.
@@ -13,17 +13,17 @@
 #
 # Usage:
 #   blender -noaudio --factory-startup --background --python \
-#   gen_module_modfile.py -- [-m <first_import_module_name>] [-o <output_file>]
+#    gen_module_modfile.py -- [-m <first_import_module_name>] [-o <output_dir>]
 #
 #     first_import_module_name:
 #       Module name to import first.
 #       This is used for finding blender's 'modules' directory.
-#       ex. addon_utils
+#       (ex. addon_utils)
 #
-#     output_file:
-#       Generated definitions are output to the JSON file whose name is
-#       specified by this option.
-#       ex. generated.json
+#     output_dir:
+#       Generated definitions are output to files which will be located to
+#       specified directory.
+#       (ex. gen_modules_modfile.generated)
 #
 ################################################################################
 
@@ -44,7 +44,7 @@ EXCLUDE_MODULE_LIST = {
 
 class GenerationConfig:
     first_import_module_name = None
-    output_file = None
+    output_dir = None
 
 
 def get_module_name_list(config: 'GenerationConfig') -> List[str]:
@@ -75,42 +75,48 @@ def import_modules(module_name_list: List[str]) -> List:
     
     return imported_modules
 
-def analyze_function(function) -> Dict:
+def analyze_function(module_name: str, function, is_method=False) -> Dict:
     function_def = {
         "name": function[0],
-        "arguments": [],
-        "return": None
+        "type": "method" if is_method else "function",
+        "parameters": [],
     }
+    if not is_method:
+        function_def["module"] = module_name
+
     if not inspect.isbuiltin(function[1]):
         try:
-            function_def["arguments"] = list(inspect.signature(function[1]).parameters.keys())
+            function_def["parameters"] = list(inspect.signature(function[1]).parameters.keys())
         except ValueError:
-            function_def["arguments"] = []
+            function_def["parameters"] = []
     
     return function_def
 
 
-def analyze_class(class_) -> Dict:
+def analyze_class(module_name: str, class_) -> Dict:
     class_def = {
         "name": class_[0],
+        "type": "class",
+        "module": module_name,
+        "base_classes": [],     # TODO
         "methods": [],
-        "parameters": [],
+        "attributes": [],
     }
     for x in [x for x in inspect.getmembers(class_[1])]:
         if x[0].startswith("_"):
-            continue        # Skip private methods and parameters.
+            continue        # Skip private methods and attributes.
 
         # Get all class method definitions.
         if callable(x[1]):
-            class_def["methods"].append(analyze_function(x))
+            class_def["methods"].append(analyze_function(module_name, x, True))
         # Get all class parameter definitions.
         else:
-            class_def["parameters"].append(x[0])
+            class_def["attributes"].append(x[0])
     
     return class_def
 
 
-def analyze_module(module) -> Dict:
+def analyze_module(module_name: str, module) -> Dict:
     result = {
         "classes": [],
         "functions": [],
@@ -125,7 +131,7 @@ def analyze_module(module) -> Dict:
             continue
         if inspect.getmodule(c[1]) != module:
             continue    # Remove indirect classes. (ex. from XXX import ZZZ)
-        result["classes"].append(analyze_class(c))
+        result["classes"].append(analyze_class(module_name, c))
 
     # Get all function definitions.
     functions = inspect.getmembers(module, inspect.isfunction)
@@ -135,7 +141,7 @@ def analyze_module(module) -> Dict:
         if inspect.getmodule(f[1]) != module:
             continue    # Remove indirect functions. (ex. from XXX import ZZZ)
 
-        result["functions"].append(analyze_function(f))
+        result["functions"].append(analyze_function(module_name, f))
     
     return result
 
@@ -143,14 +149,29 @@ def analyze_module(module) -> Dict:
 def analyze(modules: List) -> Dict:
     results = {}
     for m in modules:
-        results[m["module_name"]] = analyze_module(m["module"])
+        results[m["module_name"]] = analyze_module(m["module_name"], m["module"])
 
     return results
 
 
-def write_to_file(info: Dict, config: 'GenerationConfig'):
-    with open(config.output_file, "w") as f:
-        json.dump(info, f, indent=4, sort_keys=True, separators=(",", ": "))
+def write_to_modfile(info: Dict, config: 'GenerationConfig'):
+    data = {}
+
+    for module_name, module_info in info.items():
+        package_name = module_name[:module_name.find(".")]
+        if package_name not in data.keys():
+            data[package_name] = {
+                "new": []
+            }
+        for class_info in module_info["classes"]:
+            data[package_name]["new"].append(class_info)
+        for function_info in module_info["functions"]:
+            data[package_name]["new"].append(function_info)
+
+    os.makedirs(config.output_dir, exist_ok=True)
+    for pkg, d in data.items():
+        with open("{}/{}.json".format(config.output_dir, pkg), "w") as f:
+            json.dump(d, f, indent=4, sort_keys=True, separators=(",", ": "))
 
 
 def parse_options() -> 'GenerationConfig':
@@ -163,7 +184,7 @@ def parse_options() -> 'GenerationConfig':
     argv = argv[index:]
 
     usage = """Usage: blender -noaudio --factory-startup --background --python
-               {} -- [-m <first_import_module_name>] [-o <output_file>]"""\
+               {} -- [-m <first_import_module_name>] [-o <output_dir>]"""\
         .format(__file__)
     parser = argparse.ArgumentParser(usage)
     parser.add_argument(
@@ -173,13 +194,13 @@ def parse_options() -> 'GenerationConfig':
         """
     )
     parser.add_argument(
-        "-o", dest="output_file", type=str, help="Output file."
+        "-o", dest="output_dir", type=str, help="Output directory."
     )
     args = parser.parse_args(argv)
 
     config = GenerationConfig()
     config.first_import_module_name = args.first_import_module_name
-    config.output_file = args.output_file
+    config.output_dir = args.output_dir
 
     return config
 
@@ -197,7 +218,7 @@ def main():
     results = analyze(imported_modules)
 
     # Write module info to file.
-    write_to_file(results, config)
+    write_to_modfile(results, config)
 
 
 if __name__ == "__main__":
