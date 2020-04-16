@@ -1,21 +1,56 @@
+################################################################################
+#
+# gen_module_modfile.py
+#
+# Description:
+#   gen_module_modfile.py generates python classes and functions definition
+#   from python modules in blender's 'modules' directory.
+#   The definition file is output as a JSON file.
+#
+# Note:
+#   This script needs to run from blender.
+#   So, you need to download blender binary from blender's official website.
+#
+# Usage:
+#   blender -noaudio --factory-startup --background --python \
+#   gen_module_modfile.py -- [-m <first_import_module_name>] [-o <output_file>]
+#
+#     first_import_module_name:
+#       Module name to import first.
+#       This is used for finding blender's 'modules' directory.
+#       ex. addon_utils
+#
+#     output_file:
+#       Generated definitions are output to the JSON file whose name is
+#       specified by this option.
+#       ex. generated.json
+#
+################################################################################
+
 import inspect
 import os
 import importlib
 import json
+import argparse
+from typing import List, Dict
 
-import addon_utils
 
-
-OUTPUT_FILE_NAME = "generated.json"
 EXCLUDE_MODULE_LIST = {
     "bl_i18n_utils.settings_user",
     "bl_i18n_utils.utils_spell_check",
 }
 
 
-def get_module_name_list():
+class GenerationConfig:
+    first_import_module_name = None
+    output_file = None
+
+
+def get_module_name_list(config: 'GenerationConfig') -> List[str]:
+    first_module = importlib.import_module(config.first_import_module_name)
+
     # Get modules to import.
-    modules_dir = os.path.dirname(addon_utils.__file__)
+    modules_dir = os.path.dirname(first_module.__file__)
     module_name_list = []
     for cur_dir, _, files in os.walk(modules_dir):
         for f in files:
@@ -29,7 +64,7 @@ def get_module_name_list():
     return list(set(module_name_list) - EXCLUDE_MODULE_LIST)
 
 
-def import_modules(module_name_list):
+def import_modules(module_name_list: List[str]) -> List:
     imported_modules = []
     for name in module_name_list:
         mod = {}
@@ -39,7 +74,7 @@ def import_modules(module_name_list):
     
     return imported_modules
 
-def analyze_function(function):
+def analyze_function(function) -> Dict:
     function_def = {
         "name": function[0],
         "arguments": [],
@@ -54,7 +89,7 @@ def analyze_function(function):
     return function_def
 
 
-def analyze_class(class_):
+def analyze_class(class_) -> Dict:
     class_def = {
         "name": class_[0],
         "methods": [],
@@ -74,7 +109,7 @@ def analyze_class(class_):
     return class_def
 
 
-def analyze_module(module):
+def analyze_module(module) -> Dict:
     result = {
         "classes": [],
         "functions": [],
@@ -104,7 +139,7 @@ def analyze_module(module):
     return result
 
 
-def analyze(modules):
+def analyze(modules: List) -> Dict:
     results = {}
     for m in modules:
         results[m["module_name"]] = analyze_module(m["module"])
@@ -112,16 +147,39 @@ def analyze(modules):
     return results
 
 
-def write_to_file(info):
-    with open(OUTPUT_FILE_NAME, "w") as f:
+def write_to_file(info: Dict, config: 'GenerationConfig'):
+    with open(config.output_file, "w") as f:
         json.dump(info, f, indent=4, sort_keys=True, separators=(",", ": "))
 
 
-def main():
-    # Get modules to import.
-    module_name_list = get_module_name_list()
+def parse_options() -> 'GenerationConfig':
+    usage = """Usage: blender -noaudio --factory-startup --background --python
+               {} -- [-m <first_import_module_name>] [-o <output_file>]"""\
+        .format(__file__)
+    parser = argparse.ArgumentParser(usage)
+    parser.add_argument(
+        "-m", dest="first_import_module_name", type=str,
+        help="""Module name to import first.
+        This is used for finding blender's 'modules' directory.
+        """
+    )
+    parser.add_argument(
+        "-o", dest="output_file", type=str, help="Output file."
+    )
+    args = parser.parse_args()
 
-    #module_name_list = ["bl_previews_utils.bl_previews_render"]
+    config = GenerationConfig()
+    config.first_import_module_name = args.first_import_module_name
+    config.output_file = args.output_file
+
+    return config
+
+
+def main():
+    config = parse_options()
+
+    # Get modules to import.
+    module_name_list = get_module_name_list(config)
 
     # Import modules.
     imported_modules = import_modules(module_name_list)
@@ -130,7 +188,7 @@ def main():
     results = analyze(imported_modules)
 
     # Write module info to file.
-    write_to_file(results)
+    write_to_file(results, config)
 
 
 if __name__ == "__main__":
