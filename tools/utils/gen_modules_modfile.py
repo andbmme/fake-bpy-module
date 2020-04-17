@@ -42,6 +42,12 @@ EXCLUDE_MODULE_LIST = {
 }
 
 
+def separator():
+    if os.name == "nt":
+        return "\\"
+    return "/"
+
+
 class GenerationConfig:
     first_import_module_name = None
     output_dir = None
@@ -57,8 +63,8 @@ def get_module_name_list(config: 'GenerationConfig') -> List[str]:
         for f in files:
             if not f.endswith(".py"):
                 continue
-            module_name = os.path.join(cur_dir, f).replace(modules_dir + "/", "")
-            module_name = module_name[:-3].replace("/", ".")
+            module_name = os.path.join(cur_dir, f).replace(modules_dir + separator(), "")
+            module_name = module_name[:-3].replace(separator(), ".")
             module_name = module_name.replace(".__init__", "")
             module_name_list.append(module_name)
 
