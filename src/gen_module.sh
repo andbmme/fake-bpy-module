@@ -36,19 +36,10 @@ mkdir -p ${tmp_dir}/sphinx-out-xml
 sphinx-build -b xml ${tmp_dir}/sphinx-in ${tmp_dir}/sphinx-out-xml
 
 # generate fake bpy modules
-which python3
-if [ $? -eq 0 ]; then
-    if [ ${mod_version} = "" ]; then
-        python3 ${SCRIPT_DIR}/gen.py -i ${tmp_dir}/sphinx-out-xml -o ${output_dir} -f pep8
-    else
-        python3 ${SCRIPT_DIR}/gen.py -i ${tmp_dir}/sphinx-out-xml -o ${output_dir} -f pep8 -m ${mod_version}
-    fi
+if [ ${mod_version} = "" ]; then
+    python ${SCRIPT_DIR}/gen.py -i ${tmp_dir}/sphinx-out-xml -o ${output_dir} -f pep8
 else
-    if [ ${mod_version} = "" ]; then
-        python ${SCRIPT_DIR}/gen.py -i ${tmp_dir}/sphinx-out-xml -o ${output_dir} -f pep8
-    else
-        python ${SCRIPT_DIR}/gen.py -i ${tmp_dir}/sphinx-out-xml -o ${output_dir} -f pep8 -m ${mod_version}
-    fi
+    python ${SCRIPT_DIR}/gen.py -i ${tmp_dir}/sphinx-out-xml -o ${output_dir} -f pep8 -m ${mod_version}
 fi
 
 # clear temporary directory

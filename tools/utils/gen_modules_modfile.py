@@ -85,7 +85,9 @@ def analyze_function(module_name: str, function, is_method=False) -> Dict:
     function_def = {
         "name": function[0],
         "type": "method" if is_method else "function",
-        "parameters": [],
+        "return": {
+            "type": "return",
+        }
     }
     if not is_method:
         function_def["module"] = module_name
@@ -104,7 +106,6 @@ def analyze_class(module_name: str, class_) -> Dict:
         "name": class_[0],
         "type": "class",
         "module": module_name,
-        "base_classes": [],     # TODO
         "methods": [],
         "attributes": [],
     }
@@ -117,7 +118,13 @@ def analyze_class(module_name: str, class_) -> Dict:
             class_def["methods"].append(analyze_function(module_name, x, True))
         # Get all class parameter definitions.
         else:
-            class_def["attributes"].append(x[0])
+            attribute_def = {
+                "type": "attribute",
+                "name": x[0],
+                "class": class_[0],
+                "module": module_name
+            }
+            class_def["attributes"].append(attribute_def)
     
     return class_def
 
