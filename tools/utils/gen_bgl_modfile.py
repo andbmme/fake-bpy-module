@@ -1,14 +1,35 @@
+################################################################################
+#
+# gen_bgl_modfile.py
+#
+# Description:
+#   gen_bgl_modfile.py generates python constant and function definitions
+#   which are defined by bgl.c.
+#   The definitions are output as a modfile format (JSON).
+#
+# Note:
+#   You need to download blender source code for passing 'bgl.c' file to
+#   this script.
+#
+# Usage:
+#   python gen_bgl_modfile.py -i <bgl_c_file> -o <output_file>
+#
+#     bgl_c_file:
+#       Path to bgl.c.
+#
+#     output_file:
+#       Generated definitions are output to specified file.
+#
+################################################################################
+
 import argparse
 import re
 from typing import List, Dict
 import json
 
 
-INDENT = " " * 2
-
-
 class GenerationConfig:
-    input_bgl_c_file = None
+    bgl_c_file = None
     output_file = None
 
 
@@ -17,7 +38,7 @@ def get_function_name(line: str) -> str:
     pattern = re.compile(regex)
     match = re.match(pattern, line)
     if match:
-        return match.group(1)
+        return "gl{}".format(match.group(1))
 
     return None
 
@@ -47,7 +68,7 @@ def get_function_info(line: str) -> Dict:
         return_type = match.group(2)
         args_list = match.group(3)
         return {
-            "func_name": func_name,
+            "func_name": "gl{}".format(func_name),
             "return_type": return_type,
             "arg_types": args_list[1:-1].split(",")
         }
@@ -55,19 +76,14 @@ def get_function_info(line: str) -> Dict:
     return None
 
 
-def create_constant_mod_item_str(const_name: str, is_final: bool) -> str:
-    str = ""
-    str += INDENT * 2 + "{\n"
-    str += INDENT * 3 + "\"name\": \"" + const_name + "\",\n"
-    str += INDENT * 3 + "\"type\": \"constant\",\n"
-    str += INDENT * 3 + "\"module\": \"bgl\",\n"
-    str += INDENT * 3 + "\"data_type\": \"float\"\n"
-    if is_final:
-        str += INDENT * 2 + "}\n"
-    else:
-        str += INDENT * 2 + "},\n"
-
-    return str
+def create_constant_def(const_name: str) -> Dict:
+    constant_def = {
+        "name": const_name,
+        "type": "constant",
+        "module": "bgl",
+        "data_type": "float",
+    }
+    return constant_def
 
 
 def gltype_to_pytype(gltype: str) -> str:
@@ -104,52 +120,32 @@ def gltype_to_pytype(gltype: str) -> str:
     return type_map[gltype]
 
 
-def create_function_mod_item_str(func_name: str, return_type: str,
-                                 arg_types: List[str], is_final: bool) -> str:
-    str = ""
-    str += INDENT * 2 + "{\n"
-    str += INDENT * 3 + "\"name\": \"" + func_name + "\",\n"
-    str += INDENT * 3 + "\"type\": \"function\",\n"
-    str += INDENT * 3 + "\"module\": \"bgl\",\n"
-
-    str += INDENT * 3 + "\"return\": {\n"
-    str += INDENT * 4 + "\"type\": \"return\",\n"
-    str += INDENT * 4 + "\"data_type\": \"{}\"\n".format(gltype_to_pytype(return_type))
-    str += INDENT * 3 + "},\n"
-
-    str += INDENT * 3 + "\"parameters\": [\n"
+def create_function_def(func_name: str, return_type: str, arg_types: List[str]) -> Dict:
+    function_def = {
+        "name": func_name,
+        "type": "function",
+        "module": "bgl",
+        "return": {
+            "type": "return",
+            "data_type": gltype_to_pytype(return_type)
+        },
+        "parameters": [],
+        "parameter_details": [],
+    }
     for i, arg_type in enumerate(arg_types):
-        str += INDENT * 4 + "\"p{}\"".format(i)
-        if i == len(arg_types) - 1:
-            str += "\n"
-        else:
-            str += ",\n"
-    str += INDENT * 3 + "],\n"
+        function_def["parameters"].append("p{}".format(i))
+        function_def["parameter_details"].append({
+            "name": "p{}".format(i),
+            "type": "parameter",
+            "data_type": gltype_to_pytype(arg_type)
+        })
 
-    str += INDENT * 3 + "\"parameter_details\": [\n"
-    for i, arg_type in enumerate(arg_types):
-        str += INDENT * 4 + "{\n"
-        str += INDENT * 5 + "\"name\": \"p{}\",\n".format(i)
-        str += INDENT * 5 + "\"type\": \"parameter\",\n"
-        str += INDENT * 5 + "\"data_type\": \"{}\"\n".format(gltype_to_pytype(arg_type))
-        str += INDENT * 4 + "}"
-        if i == len(arg_types) - 1:
-            str += "\n"
-        else:
-            str += ",\n"
-    str += INDENT * 3 + "]\n"
-
-    if is_final:
-        str += INDENT * 2 + "}\n"
-    else:
-        str += INDENT * 2 + "},\n"
-
-    return str
+    return function_def
 
 
-def generate_bgl_modfile(config: 'GenerationConfig'):
+def analyze(config: 'GenerationConfig') -> Dict:
     func_info = {}
-    with open(config.input_bgl_c_file, "r") as f:
+    with open(config.bgl_c_file, "r") as f:
         data = f.read()
         regex = r"BGL_Wrap\([A-Za-z0-9]+,\s+[A-Za-z]+,\s+\([A-Za-z0-9, ]+\)\);"
         matched = re.findall(regex, data)
@@ -163,7 +159,7 @@ def generate_bgl_modfile(config: 'GenerationConfig'):
     # read and query function and constant list.
     func_lists = []
     const_lists = []
-    with open(config.input_bgl_c_file, "r") as f:
+    with open(config.bgl_c_file, "r") as f:
         l = f.readline()
         while l:
             func_name = get_function_name(l)
@@ -174,51 +170,50 @@ def generate_bgl_modfile(config: 'GenerationConfig'):
                 const_lists.append(const_name)
             l = f.readline()
 
-    # write queried functions and constants to a file
-    with open(config.output_file, "w") as f:
-        f.write("{\n")
-        f.write(INDENT + "\"new\": [\n")
-        for i, const in enumerate(const_lists):
-            is_final = (len(func_lists) == 0) and (i == len(const_lists) - 1)
-            f.write(create_constant_mod_item_str(const, is_final))
-        for i, func in enumerate(func_lists):
-            is_final = (i == len(func_lists) - 1)
-            f.write(create_function_mod_item_str(func_info[func]["func_name"],
-                                                 func_info[func]["return_type"],
-                                                 func_info[func]["arg_types"],
-                                                 is_final))
-        f.write(INDENT + "]\n")
-        f.write("}")
+    # Create data to write.
+    data = { "new": [] }
+    for const in const_lists:
+        data["new"].append(create_constant_def(const))
+    for func in func_lists:
+        data["new"].append(create_function_def(func_info[func]["func_name"],
+                                               func_info[func]["return_type"],
+                                               func_info[func]["arg_types"]))
+
+    return data
 
 
 def parse_options() -> 'GenerationConfig':
-    usage = "Usage: python {} [-i <input_bgl_c_file>] [-o <output_file>]"\
-        .format(__file__)
-    parser = argparse.ArgumentParser(usage)
+    parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-i", dest="input_bgl_c_file", type=str, help="Path to bgl.c"
+        "-i", dest="bgl_c_file", type=str, help="Path to bgl.c",
+        required=True
     )
     parser.add_argument(
-        "-o", dest="output_file", type=str, help="Output directory"
+        "-o", dest="output_file", type=str, help="Output directory",
+        required=True
     )
     args = parser.parse_args()
 
     config = GenerationConfig()
-    config.input_bgl_c_file = args.input_bgl_c_file
+    config.bgl_c_file = args.bgl_c_file
     config.output_file = args.output_file
 
     return config
 
 
-def validate_bgl_modfile(config: 'GenerationConfig'):
-    with open(config.output_file, "r") as f:
-        json.load(f)
+def write_to_modfile(info: Dict, config: 'GenerationConfig'):
+    with open(config.output_file, "w") as f:
+        json.dump(info, f, indent=4, sort_keys=True, separators=(",", ": "))
 
 
 def main():
     config = parse_options()
-    generate_bgl_modfile(config)
-    validate_bgl_modfile(config)
+
+    # Analyze bgl.c.
+    results = analyze(config)
+
+    # Write definitions to file.
+    write_to_modfile(results, config)
 
 
 if __name__ == "__main__":
