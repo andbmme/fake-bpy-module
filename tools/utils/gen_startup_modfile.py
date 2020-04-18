@@ -1,101 +1,59 @@
+################################################################################
+#
+# gen_startup_modfile.py
+#
+# Description:
+#   gen_startup_modfile.py generates python classes definition which is
+#   registered by scripts in 'startup' directory.
+#   The definitions are output as a modfile format (JSON).
+#
+# Note:
+#   This script does not need to be run from blender.
+#   However, you need to download blender for passing 'startup' directory to
+#   this script.
+#
+# Usage:
+#   python gen_startup_modfile.py -i <startup_script_dir> -o <output_file>
+#
+#     startup_script_dir:
+#       Path to blender's 'startup' directory.
+#
+#     output_file:
+#       Generated definitions are output to specified file.
+#
+################################################################################
+
 import argparse
 import ast
 import json
-from typing import List
+import os
+from typing import List, Dict
 
 
-INDENT = " " * 2
-
-
-# use below command on release/scripts to check target files
-#   egrep -rn "register_class\(" . | awk '{print $1}' | sed -E 's/:[0-9]+:.*/",/g' | sed -E 's/^\.\//"/g' | uniq
-target_py_scripts = [
-    "startup/keyingsets_builtins.py",
-    "startup/bl_operators/__init__.py",
-    "startup/bl_ui/properties_data_empty.py",
-    "startup/bl_ui/properties_physics_field.py",
-    "startup/bl_ui/properties_texture.py",
-    "startup/bl_ui/properties_material_gpencil.py",
-    "startup/bl_ui/space_sequencer.py",
-    "startup/bl_ui/space_topbar.py",
-    "startup/bl_ui/properties_particle.py",
-    "startup/bl_ui/properties_physics_rigidbody.py",
-    "startup/bl_ui/properties_freestyle.py",
-    "startup/bl_ui/space_node.py",
-    "startup/bl_ui/properties_object.py",
-    "startup/bl_ui/properties_render.py",
-    "startup/bl_ui/space_statusbar.py",
-    "startup/bl_ui/space_clip.py",
-    "startup/bl_ui/space_info.py",
-    "startup/bl_ui/properties_mask_common.py",
-    "startup/bl_ui/space_graph.py",
-    "startup/bl_ui/properties_animviz.py",
-    "startup/bl_ui/space_text.py",
-    "startup/bl_ui/properties_data_bone.py",
-    "startup/bl_ui/space_console.py",
-    "startup/bl_ui/properties_constraint.py",
-    "startup/bl_ui/properties_physics_softbody.py",
-    "startup/bl_ui/properties_data_light.py",
-    "startup/bl_ui/properties_workspace.py",
-    "startup/bl_ui/__init__.py",
-    "startup/bl_ui/properties_data_shaderfx.py",
-    "startup/bl_ui/properties_view_layer.py",
-    "startup/bl_ui/properties_data_armature.py",
-    "startup/bl_ui/properties_scene.py",
-    "startup/bl_ui/properties_data_lightprobe.py",
-    "startup/bl_ui/space_dopesheet.py",
-    "startup/bl_ui/properties_data_modifier.py",
-    "startup/bl_ui/space_outliner.py",
-    "startup/bl_ui/properties_data_speaker.py",
-    "startup/bl_ui/space_view3d.py",
-    "startup/bl_ui/properties_data_metaball.py",
-    "startup/bl_ui/space_view3d_toolbar.py",
-    "startup/bl_ui/properties_material.py",
-    "startup/bl_ui/properties_physics_common.py",
-    "startup/bl_ui/space_toolsystem_common.py",
-    "startup/bl_ui/properties_paint_common.py",
-    "startup/bl_ui/space_filebrowser.py",
-    "startup/bl_ui/properties_data_gpencil.py",
-    "startup/bl_ui/properties_physics_cloth.py",
-    "startup/bl_ui/space_nla.py",
-    "startup/bl_ui/properties_physics_rigidbody_constraint.py",
-    "startup/bl_ui/properties_grease_pencil_common.py",
-    "startup/bl_ui/space_toolsystem_toolbar.py",
-    "startup/bl_ui/space_userpref.py",
-    "startup/bl_ui/properties_data_mesh.py",
-    "startup/bl_ui/properties_data_curve.py",
-    "startup/bl_ui/properties_output.py",
-    "startup/bl_ui/properties_physics_dynamicpaint.py",
-    "startup/bl_ui/space_time.py",
-    "startup/bl_ui/space_properties.py",
-    "startup/bl_ui/properties_physics_fluid.py",
-    "startup/bl_ui/properties_data_lattice.py",
-    "startup/bl_ui/properties_physics_smoke.py",
-    "startup/bl_ui/properties_world.py",
-    "startup/bl_ui/properties_data_camera.py",
-    "startup/bl_ui/space_image.py",
-]
+def separator():
+    if os.name == "nt":
+        return "\\"
+    return "/"
 
 
 class GenerationConfig:
-    input_py_scripts_dir = None
+    startup_scripts_dir = None
     output_file = None
 
 
 def parse_options() -> 'GenerationConfig':
-    usage = "Usage: python {} [-i <input_py_scripts_dir>] [-o <output_file>]"\
-        .format(__file__)
-    parser = argparse.ArgumentParser(usage)
+    parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-i", dest="input_py_scripts_dir", type=str, help="Path to python scripts directory"
+        "-i", dest="startup_scripts_dir", type=str, help="Path to 'startup' directory.",
+        required=True
     )
     parser.add_argument(
-        "-o", dest="output_file", type=str, help="Output directory"
+        "-o", dest="output_file", type=str, help="Output directory.", required=True
     )
     args = parser.parse_args()
 
     config = GenerationConfig()
-    config.input_py_scripts_dir = args.input_py_scripts_dir
+    config.startup_scripts_dir = args.startup_scripts_dir
     config.output_file = args.output_file
 
     return config
@@ -109,24 +67,6 @@ def reverse_walk_find(node, cls):
     return reverse_walk_find(node.parent, cls)
 
 
-def create_class_mod_item_str(class_name: str, base_classes: List[str],
-                              is_final: bool) -> str:
-    str = ""
-    str += INDENT * 2 + "{\n"
-    str += INDENT * 3 + "\"name\": \"" + class_name + "\",\n"
-    str += INDENT * 3 + "\"type\": \"class\",\n"
-    str += INDENT * 3 + "\"module\": \"bpy.types\",\n"
-    str += INDENT * 3 + "\"base_classes\": [" + ", ".join(base_classes) + "],\n"
-    str += INDENT * 3 + "\"methods\": [],\n"
-    str += INDENT * 3 + "\"attributes\": []\n"
-    if is_final:
-        str += INDENT * 2 + "}\n"
-    else:
-        str += INDENT * 2 + "},\n"
-
-    return str
-
-
 def is_primitive_class(class_: str) -> bool:
     primitive_classes = [
         "Panel",
@@ -138,22 +78,37 @@ def is_primitive_class(class_: str) -> bool:
     return class_ in primitive_classes
 
 
-def generate_bgl_modfile(config: 'GenerationConfig'):
+def get_scripts_list_to_parse(config: 'GenerationConfig') -> List[str]:
+    scripts_to_parse = []
+    for cur_dir, _, files in os.walk(config.startup_scripts_dir):
+        for file_ in files:
+            if not file_.endswith(".py"):
+                continue
+
+            filepath = os.path.join(cur_dir, file_).replace("/", separator())
+            with open(filepath, "r") as f:
+                lines = [l for l in f.readlines() if l.find("register_class(") != -1]
+            if len(lines) > 0:
+                scripts_to_parse.append(filepath)
+
+    return scripts_to_parse            
+
+
+def analyze(scripts_paths: List[str]) -> Dict:
     root_nodes = {}
-    for script in target_py_scripts:
-        script_path = "{}/{}".format(config.input_py_scripts_dir, script)
+    for script_path in scripts_paths:
         with open(script_path, "r") as f:
             source = f.read()
 
-        root_nodes[script_path] = ast.parse(source, config.input_py_scripts_dir)
+        root_nodes[script_path] = ast.parse(source, script_path)
 
-    # add parent attribute for reverse walk
+    # Add parent attribute for reverse walk.
     for root in root_nodes.values():
         for node in ast.walk(root):
             for child in ast.iter_child_nodes(node):
                 child.parent = node
 
-    # get all class definitions
+    # Get all class definitions.
     class_defs = []
     for root in root_nodes.values():
         for node in ast.walk(root):
@@ -162,7 +117,7 @@ def generate_bgl_modfile(config: 'GenerationConfig'):
 
     classes_to_be_registerd = []
     for script_path, root in root_nodes.items():
-        # find if __name__ == '__main__'
+        # Find if __name__ == '__main__'.
         for node in ast.walk(root):
             if not isinstance(node, ast.If):
                 continue
@@ -183,14 +138,14 @@ def generate_bgl_modfile(config: 'GenerationConfig'):
             print("Could not find if __name__ == '__main__' (file: {})".format(script_path))
             continue
 
-        # find class to be registered by bpy.utils.register_class
+        # Find class to be registered by bpy.utils.register_class().
         for node in ast.walk(main_node):
             if not isinstance(node, ast.Call):
                 continue
             if node.func.id != "register_class":
                 continue
 
-            # parse 'for' statement based register_class
+            # Parse 'for' statement based register_class.
             # example:
             #   classes = [...]
             #   for cls in classes:
@@ -213,29 +168,39 @@ def generate_bgl_modfile(config: 'GenerationConfig'):
                             continue
                         classes_to_be_registerd.extend([cdef for cdef in class_defs if cdef.name == c.id])
 
-    # write queried classes to a file
+    # Create data to write.
+    data = { "new": [] }
+    for class_ in classes_to_be_registerd:
+        base_classes = ["bpy.types.{}".format(c.id)
+                        for c in class_.bases
+                        if isinstance(c, ast.Name) and is_primitive_class(c.id)]
+        class_def = {
+            "name": class_.name,
+            "type": "class",
+            "module": "bpy.types",
+            "base_classes": base_classes,
+        }
+        data["new"].append(class_def)
+    
+    return data
+
+
+def write_to_modfile(info: Dict, config: 'GenerationConfig'):
     with open(config.output_file, "w") as f:
-        f.write("{\n")
-        f.write(INDENT + "\"new\": [\n")
-        for i, class_ in enumerate(classes_to_be_registerd):
-            is_final = (i == len(classes_to_be_registerd) - 1)
-            base_classes = ["\"bpy.types.{}\"".format(c.id)
-                            for c in class_.bases
-                            if isinstance(c, ast.Name) and is_primitive_class(c.id)]
-            f.write(create_class_mod_item_str(class_.name, base_classes, is_final))
-        f.write(INDENT + "]\n")
-        f.write("}")
-
-
-def validate_bgl_modfile(config: 'GenerationConfig'):
-    with open(config.output_file, "r") as f:
-        json.load(f)
+        json.dump(info, f, indent=4, sort_keys=True, separators=(",", ": "))
 
 
 def main():
     config = parse_options()
-    generate_bgl_modfile(config)
-    validate_bgl_modfile(config)
+
+    # Find python scripts to parse.
+    scripts_to_parse = get_scripts_list_to_parse(config)
+
+    # Analyze scripts.
+    results = analyze(scripts_to_parse)
+
+    # Write registered classes to file.
+    write_to_modfile(results, config)
 
 
 if __name__ == "__main__":

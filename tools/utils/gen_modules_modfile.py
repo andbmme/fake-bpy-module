@@ -13,7 +13,7 @@
 #
 # Usage:
 #   blender -noaudio --factory-startup --background --python \
-#    gen_module_modfile.py -- [-m <first_import_module_name>] [-o <output_dir>]
+#     gen_module_modfile.py -- -m <first_import_module_name> -o <output_dir>
 #
 #     first_import_module_name:
 #       Module name to import first.
@@ -208,10 +208,11 @@ def parse_options() -> 'GenerationConfig':
         "-m", dest="first_import_module_name", type=str,
         help="""Module name to import first.
         This is used for finding blender's 'modules' directory.
-        """
+        """,
+        required=True
     )
     parser.add_argument(
-        "-o", dest="output_dir", type=str, help="Output directory."
+        "-o", dest="output_dir", type=str, help="Output directory.", required=True
     )
     args = parser.parse_args(argv)
 
