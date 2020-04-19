@@ -76,8 +76,8 @@ def make_bpy_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGeneratio
     files = list(set(all_files) - set(excludes_files))
     mod_files = [
         "{}/mods/common/analyzer/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
-        "{}/mods/generated-mods/gen_startup_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
-        "{}/mods/generated-mods/gen_modules_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/mods/generated_mods/gen_startup_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/mods/generated_mods/gen_modules_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
     ]
     if config.mod_version in ["2.80"]:
         mod_files.append("{}/mods/2.80/analyzer/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"))
@@ -91,7 +91,7 @@ def make_bpy_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGeneratio
 def make_bgl_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGenerationRule':
     files = glob.glob(INPUT_DIR + "/bgl*.xml")
     mod_files = [
-        "{}/mods/generated-mods/gen_bgl_modfile/bgl.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/mods/generated_mods/gen_bgl_modfile/bgl.json".format(MOD_FILES_DIR).replace("\\", "/"),
     ]
     return fbm.PackageGenerationRule("bgl", files, BglAnalyzer(mod_files), fbm.BaseGenerator())
 
@@ -122,7 +122,7 @@ def make_gpu_extras_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGe
     excludes_files = glob.glob(INPUT_DIR + "/bpy_extras*.xml")
     files = list(set(all_files) - set(excludes_files))
     mod_files = [
-        "{}/mods/generated-mods/gen_modules_modfile/gpu_extras.json".format(MOD_FILES_DIR).replace("\\", "/")
+        "{}/mods/generated_mods/gen_modules_modfile/gpu_extras.json".format(MOD_FILES_DIR).replace("\\", "/")
     ]
     return fbm.PackageGenerationRule("gpu_extras", files, fbm.AnalyzerWithModFile(mod_files), fbm.BaseGenerator())
 
@@ -139,7 +139,7 @@ def make_bpy_extras_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGe
     files = glob.glob(INPUT_DIR + "/bpy_extras*.xml")
     mod_files = [
         "{}/mods/common/analyzer/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
-        "{}/mods/generated-mods/gen_modules_modfile/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/")
+        "{}/mods/generated_mods/gen_modules_modfile/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/")
     ]
     return fbm.PackageGenerationRule("bpy_extras", files, fbm.AnalyzerWithModFile(mod_files), fbm.BaseGenerator())
 
@@ -158,11 +158,11 @@ def make_bmesh_rule(config: 'fbm.PackageGeneratorConfig') -> 'fbm.PackageGenerat
 
 
 def make_other_rules(config: 'fbm.PackageGeneratorConfig') -> List['fbm.PackageGenerationRule']:
-    mod_files = glob.glob("{}/mods/generated-mods/gen_modules_modfile/*.json".format(MOD_FILES_DIR).replace("\\", "/"))
+    mod_files = glob.glob("{}/mods/generated_mods/gen_modules_modfile/*.json".format(MOD_FILES_DIR).replace("\\", "/"))
     mod_files = set(mod_files) - {
-        "{}/mods/generated-mods/gen_modules_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
-        "{}/mods/generated-mods/gen_modules_modfile/gpu_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
-        "{}/mods/generated-mods/gen_modules_modfile/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/mods/generated_mods/gen_modules_modfile/bpy.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/mods/generated_mods/gen_modules_modfile/gpu_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
+        "{}/mods/generated_mods/gen_modules_modfile/bpy_extras.json".format(MOD_FILES_DIR).replace("\\", "/"),
     }
 
     rules = []
