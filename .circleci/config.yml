@@ -10,6 +10,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Set release version environment variable
+          command: export RELEASE_VERSION=`date '+%Y%m%d'`
+      - run:
           name: Generate pip Packages (Blender 2.78)
           command: bash tools/pip_package/build_pip_package.sh release 2.78 ../blender ../blender-bin/blender-v278-bin
       - run:
