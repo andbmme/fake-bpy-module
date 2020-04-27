@@ -31,7 +31,7 @@ version=${2}
 source_dir=${3}
 blender_dir=${4}
 
-if [ "${RELEASE_VERSION}" = ""]; then
+if [ ${RELEASE_VERSION:-not_exist} = "not_exist"]; then
     echo "Environment variable 'RELEASE_VERSION' does not exist, so use date as release version"
     release_version=`date '+%Y%m%d'`
 else
