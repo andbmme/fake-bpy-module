@@ -519,7 +519,7 @@ class BaseAnalyzer:
         for child in list(elm):
             if child.tag == "paragraph":    # <paragraph>base classes — </paragraph>
                 # This is a special case to get base classes.
-                if child.text.startswith("base classes — "):
+                if child.text and child.text.startswith("base classes — "):
                     base_classes = self._analyze_base_classes(filename, child)
             elif child.tag == "desc":     # <desc>
                 if not base_classes:
