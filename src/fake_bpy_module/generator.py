@@ -265,10 +265,53 @@ class BaseGenerator:
                  style_config: str='pep8'):
         # At first, sort data to avoid generating large diff.
         # Note: Base class must be located above derived class
-        sorted_data = sorted(
-            data.data,
-            key=lambda x: (1 if isinstance(x, ClassInfo) and len(x.base_classes()) >= 1 else 0, x.type(), x.name())
-        )
+        # sorted_data = sorted(
+        #     data.data,
+        #     key=lambda x: (1 if isinstance(x, ClassInfo) and len(x.base_classes()) >= 1 else 0, x.type(), x.name())
+        # )
+
+        class_data : List['ClassInfo'] = []
+        function_data = []
+        constant_data = []
+        for d in data.data:
+            if d.type() == "class":         # TODO: use class variable
+                class_data.append(d)
+            elif d.type() == "function":
+                function_data.append(d)
+            elif d.type() == "constant":
+                constant_data.append(d)
+            else:
+                raise ValueError("Invalid data type. ({})".format(d.type))
+        class_data = sorted(class_data, key=lambda x: x.name())
+
+        # Sort class data
+        from .dag import DAG, topological_sort
+        from collections import OrderedDict
+        graph = DAG()
+        nodes = OrderedDict()
+        for c in class_data:
+            nodes[c.name] = graph.make_node(c)
+        for c in class_data:
+            cn = nodes[c.name]
+            for bc in c.base_classes():
+                bcn = nodes.get(bc)
+                if bcn:
+                    graph.make_edge(cn, bcn)
+        sorted_nodes = topological_sort(graph)
+
+        sorted_class_data = [node.data for node in sorted_nodes].reverse()
+
+        # Sort function data
+        sorted_function_data = sorted(function_data, key=lambda x: x.name())
+
+        # Sort constant data
+        sorted_constant_data = sorted(constant_data, key=lambda x: x.name())
+
+        # Merge
+        sorted_data = sorted_class_data
+        sorted_data.extend(sorted_function_data)
+        sorted_data.extend(sorted_constant_data)
+
 
         with open(filename, "w", encoding="utf-8") as file:
             self.print_header(file)
