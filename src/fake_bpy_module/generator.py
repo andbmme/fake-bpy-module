@@ -299,7 +299,8 @@ class BaseGenerator:
                     graph.make_edge(cn, bcn)
         sorted_nodes = topological_sort(graph)
 
-        sorted_class_data = [node.data for node in sorted_nodes].reverse()
+        sorted_class_data = [node.data for node in sorted_nodes]
+        sorted_class_data.reverse()
 
         # Sort function data
         sorted_function_data = sorted(function_data, key=lambda x: x.name())
