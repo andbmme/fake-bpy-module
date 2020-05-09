@@ -277,8 +277,7 @@ class BaseGenerator:
                 constant_data.append(d)
             else:
                 raise ValueError("Invalid data type. ({})".format(d.type))
-        # Reversed alphabetical order is needed to take into accout of topological sort.
-        class_data = sorted(class_data, key=lambda x: x.name(), reverse=True)
+        class_data = sorted(class_data, key=lambda x: x.name())
 
         # Sort class data (with class inheritance dependencies)
         graph = DAG()
@@ -292,14 +291,27 @@ class BaseGenerator:
                     raise ValueError("DataType of base class must be 1. ({})".format(class_.name()))
                 base_class_node = class_name_to_nodes.get(base_class.data_types()[0])
                 if base_class_node:
-                    graph.make_edge(class_node, base_class_node)
+                    graph.make_edge(base_class_node, class_node)
                 else:
                     output_log(LOG_LEVEL_WARN,
                                "Base class node (type={}) is not found"
                                .format(base_class.data_types()[0]))
         sorted_nodes = topological_sort(graph)
         sorted_class_data = [node.data for node in sorted_nodes]
-        sorted_class_data.reverse()     # Topological sort output an reversed order, which we do not want 
+
+        # Sort base classes
+        order = {}
+        for i, class_ in enumerate(sorted_class_data):
+            order[class_.name()] = i
+        for class_ in sorted_class_data:
+            def sort_func(x):
+                if x.data_types()[0] not in order.keys():
+                    return 0
+                return -order[x.data_types()[0]]
+
+            new_base_classes = sorted(class_.base_classes(), key=sort_func)
+            for i, c in enumerate(new_base_classes):
+                class_.set_base_class(i, c)
 
         # Sort function data
         sorted_function_data = sorted(function_data, key=lambda x: x.name())
