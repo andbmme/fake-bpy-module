@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 TMP_DIR_NAME=gen_module-tmp
 SCRIPT_DIR=$(cd $(dirname $0); pwd)
