@@ -60,18 +60,3 @@ def topological_sort(graph : 'DAG') -> List['Node']:
         raise ValueError("Cycle is detected. ({})".format(", ".join(node_data_list)))
 
     return sorted_nodes
-
-
-if __name__ == "__main__":
-    g = DAG()
-    n1 = g.make_node("a")
-    n2 = g.make_node("b")
-    n3 = g.make_node("c")
-    e = g.make_edge(n1, n2)
-    e = g.make_edge(n3, n1)
-    #e = g.make_edge(n2, n1)
-
-    sn = topological_sort(g)
-
-    for n in sn:
-        print(n.data)

@@ -3,6 +3,7 @@ import re
 import pathlib
 from yapf.yapflib.yapf_api import FormatCode
 from typing import List, Dict
+from collections import OrderedDict
 
 from .common import (
     DataType,
@@ -22,6 +23,10 @@ from .utils import (
     remove_unencodable,
     output_log,
     LOG_LEVEL_WARN,
+)
+from .dag import (
+    DAG,
+    topological_sort
 )
 
 INDENT = "    "
@@ -259,22 +264,12 @@ class BaseGenerator:
 
         return processed
 
-    def generate(self,
-                 filename: str,
-                 data: 'GenerationInfoByTarget',
-                 style_config: str='pep8'):
-        # At first, sort data to avoid generating large diff.
-        # Note: Base class must be located above derived class
-        # sorted_data = sorted(
-        #     data.data,
-        #     key=lambda x: (1 if isinstance(x, ClassInfo) and len(x.base_classes()) >= 1 else 0, x.type(), x.name())
-        # )
-
+    def _sorted_generation_info(self, data: 'GenerationInfoByTarget') -> List['Info']:
         class_data : List['ClassInfo'] = []
-        function_data = []
-        constant_data = []
+        function_data : List['FunctionInfo'] = []
+        constant_data : List['VariableInfo'] = []
         for d in data.data:
-            if d.type() == "class":         # TODO: use class variable
+            if d.type() == "class":         # TODO: use class variable instead of "class", "function", "constant"
                 class_data.append(d)
             elif d.type() == "function":
                 function_data.append(d)
@@ -282,25 +277,29 @@ class BaseGenerator:
                 constant_data.append(d)
             else:
                 raise ValueError("Invalid data type. ({})".format(d.type))
-        class_data = sorted(class_data, key=lambda x: x.name())
+        # Reversed alphabetical order is needed to take into accout of topological sort.
+        class_data = sorted(class_data, key=lambda x: x.name(), reverse=True)
 
-        # Sort class data
-        from .dag import DAG, topological_sort
-        from collections import OrderedDict
+        # Sort class data (with class inheritance dependencies)
         graph = DAG()
-        nodes = OrderedDict()
-        for c in class_data:
-            nodes[c.name] = graph.make_node(c)
-        for c in class_data:
-            cn = nodes[c.name]
-            for bc in c.base_classes():
-                bcn = nodes.get(bc)
-                if bcn:
-                    graph.make_edge(cn, bcn)
+        class_name_to_nodes = OrderedDict()
+        for class_ in class_data:
+            class_name_to_nodes[class_.name()] = graph.make_node(class_)
+        for class_ in class_data:
+            class_node = class_name_to_nodes[class_.name()]
+            for base_class in class_.base_classes():
+                if len(base_class.data_types()) != 1:
+                    raise ValueError("DataType of base class must be 1. ({})".format(class_.name()))
+                base_class_node = class_name_to_nodes.get(base_class.data_types()[0])
+                if base_class_node:
+                    graph.make_edge(class_node, base_class_node)
+                else:
+                    output_log(LOG_LEVEL_WARN,
+                               "Base class node (type={}) is not found"
+                               .format(base_class.data_types()[0]))
         sorted_nodes = topological_sort(graph)
-
         sorted_class_data = [node.data for node in sorted_nodes]
-        sorted_class_data.reverse()
+        sorted_class_data.reverse()     # Topological sort output an reversed order, which we do not want 
 
         # Sort function data
         sorted_function_data = sorted(function_data, key=lambda x: x.name())
@@ -313,6 +312,15 @@ class BaseGenerator:
         sorted_data.extend(sorted_function_data)
         sorted_data.extend(sorted_constant_data)
 
+        return sorted_data
+
+    def generate(self,
+                 filename: str,
+                 data: 'GenerationInfoByTarget',
+                 style_config: str='pep8'):
+        # At first, sort data to avoid generating large diff.
+        # Note: Base class must be located above derived class
+        sorted_data = self._sorted_generation_info(data)
 
         with open(filename, "w", encoding="utf-8") as file:
             self.print_header(file)
