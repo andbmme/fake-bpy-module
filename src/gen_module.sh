@@ -4,7 +4,7 @@ TMP_DIR_NAME=gen_module-tmp
 SCRIPT_DIR=$(cd $(dirname $0); pwd)
 
 if [ $# -ne 4 ] && [ $# -ne 5 ]; then
-    echo "Usage: sh gen_module.sh <source-dir> <blender-dir> <branch/tag/commit> <output-dir> [<mod-version>]"
+    echo "Usage: bash gen_module.sh <source-dir> <blender-dir> <branch/tag/commit> <output-dir> [<mod-version>]"
     exit 1
 fi
 
